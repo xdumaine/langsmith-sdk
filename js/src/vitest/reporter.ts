@@ -7,24 +7,24 @@ import { RunnerTestFile } from "vitest";
 import {
   printVitestReporterTable,
   printVitestTestModulesReporterTable,
-  type VitestTestModule,
 } from "./utils/reporter.js";
 
 class LangSmithEvalReporter extends DefaultReporter {
+  private skipOnFinished = false;
+
   async onFinished(files: RunnerTestFile[], errors: unknown[]) {
-    super.onFinished(files, errors);
+    const reporter = DefaultReporter.prototype as {
+      onFinished?: (files: RunnerTestFile[], errors: unknown[]) => void;
+    };
+    reporter.onFinished?.call(this, files, errors);
+    if (this.skipOnFinished) return;
     await printVitestReporterTable(files, this.ctx);
   }
 
-  // @ts-expect-error Vitest 4.x introduces a new `onTestRunEnd` method
-  async onTestRunEnd(
-    testModules: VitestTestModule[],
-    unhandledErrors: unknown[],
-    reason: "passed" | "interrupted" | "failed",
-  ) {
-    // @ts-expect-error Vitest 4.x introduces a new `onTestRunEnd` method
-    super.onTestRunEnd(testModules, unhandledErrors, reason);
-    await printVitestTestModulesReporterTable(testModules);
+  async onTestRunEnd(...args: Parameters<DefaultReporter["onTestRunEnd"]>) {
+    super.onTestRunEnd(...args);
+    this.skipOnFinished = true;
+    await printVitestTestModulesReporterTable(args[0]);
   }
 }
 
